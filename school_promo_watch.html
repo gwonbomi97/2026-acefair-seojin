@@ -79,10 +79,32 @@
   .record-status.ok{color:var(--success-dark);}
   .record-status.fail{color:#C9612F;}
   .reset-link{background:none;border:none;color:var(--ink-soft);font-size:12.5px;text-decoration:underline;cursor:pointer;padding:6px;}
+  .ext-overlay{
+    position:fixed;inset:0;z-index:99;background:rgba(10,14,32,0.94);
+    display:none;align-items:center;justify-content:center;padding:24px;
+  }
+  .ext-overlay.show{display:flex;}
+  .ext-box{background:var(--paper);color:var(--ink);border-radius:18px;padding:26px 22px;max-width:360px;width:100%;text-align:center;}
+  .ext-box h3{font-family:'Gowun Batang', serif;font-size:20px;margin:0 0 10px;}
+  .ext-box p{font-size:14px;line-height:1.6;color:var(--ink-soft);margin:0 0 16px;}
+  .ext-box .steps{text-align:left;font-size:13.5px;line-height:1.7;background:#F1ECDF;border-radius:12px;padding:12px 14px;margin-bottom:14px;}
+  .ext-btn{display:block;width:100%;border:none;border-radius:12px;padding:14px;font-family:'Noto Sans KR',sans-serif;font-size:15px;font-weight:700;
+    background:linear-gradient(135deg, var(--gold-400), #ECA525);color:#231703;cursor:pointer;text-decoration:none;}
+  .ext-skip{background:none;border:none;color:var(--ink-soft);font-size:12.5px;text-decoration:underline;margin-top:10px;cursor:pointer;}
   @media (prefers-reduced-motion: reduce){.progress-fill,.cta{transition:none;}}
 </style>
 </head>
 <body>
+
+<div class="ext-overlay" id="extOverlay">
+  <div class="ext-box">
+    <h3>브라우저에서 열어 주세요</h3>
+    <p>앱 안에서는 영상 재생이 원활하지 않을 수 있어요.<br>Chrome이나 Safari에서 열면 정상적으로 시청돼요.</p>
+    <div class="steps" id="extSteps"></div>
+    <a class="ext-btn" id="extOpenBtn" href="#">브라우저로 열기</a>
+    <button class="ext-skip" id="extSkip">그냥 여기서 볼게요</button>
+  </div>
+</div>
 
 <div class="stage" id="stage">
 
@@ -124,6 +146,42 @@
 </div>
 
 <script>
+  /* ---- 인앱 브라우저(카카오톡·라인·인스타 등)에서 열리면 외부 브라우저로 넘기기 ---- */
+  (function(){
+    var ua = navigator.userAgent || '';
+    var url = window.location.href;
+    var isIOS = /iPhone|iPad|iPod/i.test(ua);
+    var isAndroid = /Android/i.test(ua);
+
+    if(/KAKAOTALK/i.test(ua)){
+      window.location.href = 'kakaotalk://web/openExternal?url=' + encodeURIComponent(url);
+      return;
+    }
+    if(/Line\//i.test(ua)){
+      if(url.indexOf('openExternalBrowser=1') < 0){
+        window.location.href = url + (url.indexOf('?') > -1 ? '&' : '?') + 'openExternalBrowser=1';
+      }
+      return;
+    }
+    var otherInApp = /Instagram|FBAN|FBAV|FB_IAB|NAVER\(inapp|DaumApps|everytimeApp|TelegramBot|Snapchat/i.test(ua)
+                  || (isIOS && !/Safari/i.test(ua))
+                  || (isAndroid && /; wv\)/i.test(ua));
+    if(!otherInApp) return;
+
+    var overlay = document.getElementById('extOverlay');
+    var btn = document.getElementById('extOpenBtn');
+    var steps = document.getElementById('extSteps');
+    if(isAndroid){
+      btn.href = 'intent://' + url.replace(/^https?:\/\//,'') + '#Intent;scheme=https;package=com.android.chrome;end';
+      steps.innerHTML = '버튼이 안 되면: 화면 오른쪽 위 <b>⋮</b> 또는 <b>공유</b> → <b>다른 브라우저로 열기</b>';
+    }else{
+      btn.style.display = 'none';
+      steps.innerHTML = '화면 오른쪽 위(또는 아래) <b>⋯</b> / <b>공유</b> 아이콘 → <b>Safari로 열기</b>';
+    }
+    overlay.classList.add('show');
+    document.getElementById('extSkip').addEventListener('click', function(){ overlay.classList.remove('show'); });
+  })();
+
   var VIDEO_ID = 'Yg1IUxx3leE';   // https://youtu.be/Yg1IUxx3leE
   var THRESHOLD = 0.9;             // 90% 이상 시청해야 인증
   // 집계용 Apps Script 웹앱 URL (부스 페이지와 같은 주소)
