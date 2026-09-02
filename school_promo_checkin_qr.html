@@ -231,7 +231,8 @@
 <script>
   var VIDEO_ID = 'Yg1IUxx3leE';
   var THRESHOLD = 0.9;
-  var STORAGE_PREFIX = 'checkins:';
+  // 집계용 Apps Script 웹앱 URL (배포 후 나오는 https://script.google.com/macros/s/.../exec 주소)
+  var API_URL = 'https://script.google.com/macros/s/AKfycbymEagi7F7gsYsqr2xY8GrZ9YBj8UcOBPRh3os6I1XW4VNF5eSnCRlD6jyiwPIb3_TvVg/exec';
   var isWatchMode = document.documentElement.className === 'mode-watch';
 
   /* ---------------- 공통: QR 코드 URL 만들기 ---------------- */
@@ -275,30 +276,26 @@
     async function refreshStats(){
       var statNum = document.getElementById('statNum');
       var recentBody = document.getElementById('recentBody');
+      if(!API_URL){
+        statNum.textContent = '–';
+        recentBody.innerHTML = '<div class="empty-note">집계 주소(API_URL)가 설정되지 않았어요</div>';
+        return;
+      }
       try{
-        var listResult = await window.storage.list(STORAGE_PREFIX, true);
-        var keys = (listResult && listResult.keys) ? listResult.keys.slice() : [];
-        statNum.textContent = keys.length;
-
-        if(keys.length === 0){
+        var res = await fetch(API_URL + '?action=stats&_=' + Date.now(), { cache: 'no-store' });
+        var data = await res.json();
+        statNum.textContent = data.count;
+        if(!data.recent || data.recent.length === 0){
           recentBody.innerHTML = '<div class="empty-note">아직 완료한 사람이 없어요</div>';
           return;
         }
-
-        keys.sort();
-        var recentKeys = keys.slice(-5).reverse();
         var rows = '';
-        for(var i=0;i<recentKeys.length;i++){
-          try{
-            var res = await window.storage.get(recentKeys[i], true);
-            if(!res) continue;
-            var data = JSON.parse(res.value);
-            rows += '<div class="recent-item"><span class="recent-name">' +
-              escapeHtml(data.name || '익명') + '</span><span class="recent-time">' +
-              timeAgo(data.time) + '</span></div>';
-          }catch(inner){ /* 개별 항목 오류는 건너뜀 */ }
+        for(var i=0;i<data.recent.length;i++){
+          rows += '<div class="recent-item"><span class="recent-name">코드 ' +
+            escapeHtml(data.recent[i].code) + '</span><span class="recent-time">' +
+            timeAgo(data.recent[i].time) + '</span></div>';
         }
-        recentBody.innerHTML = rows || '<div class="empty-note">불러올 수 없어요</div>';
+        recentBody.innerHTML = rows;
       }catch(e){
         statNum.textContent = '–';
         recentBody.innerHTML = '<div class="empty-note">실시간 집계를 불러올 수 없어요</div>';
@@ -447,14 +444,13 @@
       var name = '';
       var now = new Date().toISOString();
       var code = String(Math.floor(1000 + Math.random()*9000));
-      var key = STORAGE_PREFIX + now + '-' + Math.random().toString(36).slice(2,7);
-
       var saved = false;
-      try{
-        var result = await window.storage.set(key, JSON.stringify({ name: name || '익명', time: now, code: code }), true);
-        saved = !!result;
-      }catch(e){
-        saved = false;
+      if(API_URL){
+        try{
+          var r = await fetch(API_URL + '?action=add&code=' + code + '&_=' + Date.now(), { cache: 'no-store' });
+          var j = await r.json();
+          saved = !!(j && j.ok);
+        }catch(e){ saved = false; }
       }
 
       codeValue.textContent = code;
