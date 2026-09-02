@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>홍보영상 시청 인증</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --navy-900:#17213D;
+    --navy-700:#232F55;
+    --navy-600:#2C3A68;
+    --gold-400:#F5B942;
+    --gold-300:#F8C868;
+    --gold-100:#FBE2A5;
+    --paper:#FBF8F2;
+    --ink:#17213D;
+    --ink-soft:#5B6690;
+    --success:#3FB68A;
+    --success-dark:#2C8A68;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;min-height:100vh;
+    background:
+      radial-gradient(circle at 12% -10%, rgba(245,185,66,0.16), transparent 45%),
+      radial-gradient(circle at 100% 110%, rgba(63,182,138,0.12), transparent 40%),
+      var(--navy-900);
+    font-family:'Noto Sans KR', sans-serif;
+    color:var(--paper);
+    display:flex;justify-content:center;
+    padding:28px 16px 40px;
+  }
+  .stage{width:100%;max-width:460px;}
+  .badge{
+    display:inline-flex;align-items:center;gap:6px;
+    background:rgba(245,185,66,0.14);border:1px solid rgba(245,185,66,0.4);
+    color:var(--gold-100);font-size:13px;font-weight:500;padding:6px 12px;border-radius:999px;
+  }
+  .badge svg{width:14px;height:14px;flex-shrink:0;}
+  h1{font-family:'Gowun Batang', serif;font-weight:700;font-size:28px;line-height:1.35;margin:14px 0 8px;letter-spacing:-0.01em;}
+  h1 .accent{color:var(--gold-300);}
+  .sub{font-size:14.5px;line-height:1.6;color:#C7CCE6;margin:0 0 22px;}
+  .video-card{background:var(--paper);border-radius:20px;padding:14px;box-shadow:0 20px 44px rgba(6,10,26,0.35);}
+  .video-frame{position:relative;width:100%;aspect-ratio:16/9;border-radius:12px;overflow:hidden;background:#0c1226;}
+  .video-frame #player{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;}
+  .progress-row{display:flex;align-items:center;gap:12px;margin-top:14px;}
+  .progress-track{flex:1;height:8px;border-radius:999px;background:#EAE4D3;overflow:hidden;}
+  .progress-fill{height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg, var(--gold-400), var(--gold-300));transition:width .35s ease;}
+  .progress-pct{font-size:13px;font-weight:700;color:var(--ink);min-width:34px;text-align:right;font-variant-numeric:tabular-nums;}
+  .status-line{margin-top:10px;font-size:12.5px;color:var(--ink-soft);}
+  .cta{
+    width:100%;margin-top:20px;border:none;border-radius:14px;padding:17px 20px;
+    font-family:'Noto Sans KR', sans-serif;font-size:16.5px;font-weight:700;cursor:pointer;
+    transition:transform .15s ease, box-shadow .15s ease, background .2s ease;
+  }
+  .cta[disabled]{background:rgba(255,255,255,0.06);color:#7C87AC;cursor:not-allowed;}
+  .cta.ready{background:linear-gradient(135deg, var(--gold-400), #ECA525);color:#231703;box-shadow:0 14px 26px rgba(245,185,66,0.28);}
+  .cta.ready:active{transform:scale(0.98);box-shadow:0 8px 16px rgba(245,185,66,0.24);}
+  .done-wrap{
+    display:none;background:var(--paper);border-radius:20px;padding:34px 26px 30px;text-align:center;
+    box-shadow:0 20px 44px rgba(6,10,26,0.35);color:var(--ink);
+  }
+  .done-wrap.show{display:block;}
+  .stage.done .video-card,.stage.done .cta{display:none;}
+  .check-circle{
+    width:64px;height:64px;margin:0 auto 16px;border-radius:50%;
+    background:linear-gradient(135deg, var(--success), var(--success-dark));
+    display:flex;align-items:center;justify-content:center;box-shadow:0 10px 20px rgba(63,182,138,0.35);
+  }
+  .check-circle svg{width:30px;height:30px;}
+  .done-wrap h2{font-family:'Gowun Batang', serif;font-size:22px;margin:0 0 6px;}
+  .done-wrap p{font-size:13.5px;color:var(--ink-soft);margin:0 0 22px;line-height:1.55;}
+  .code-box{background:var(--navy-900);border-radius:14px;padding:18px;margin-bottom:22px;}
+  .code-label{font-size:12px;color:var(--gold-100);margin-bottom:6px;}
+  .code-value{font-size:34px;font-weight:800;letter-spacing:0.12em;color:var(--paper);font-variant-numeric:tabular-nums;}
+  .reset-link{background:none;border:none;color:var(--ink-soft);font-size:12.5px;text-decoration:underline;cursor:pointer;padding:6px;}
+  @media (prefers-reduced-motion: reduce){.progress-fill,.cta{transition:none;}}
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage">
+
+  <span class="badge">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+    학교 홍보 부스
+  </span>
+
+  <h1>영상을 끝까지 보면<br><span class="accent">작은 선물</span>이 열려요</h1>
+  <p class="sub">아래 영상을 처음부터 끝까지 시청해 주세요. 다 보고 나면 인증 코드가 나와요. 그 화면을 스태프에게 보여주시면 선물을 드려요.</p>
+
+  <div class="video-card">
+    <div class="video-frame">
+      <iframe id="player" title="학교 홍보 영상" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen playsinline></iframe>
+    </div>
+    <div class="progress-row">
+      <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-pct" id="progressPct">0%</div>
+    </div>
+    <div class="status-line" id="statusLine">영상을 재생하면 시청 기록이 시작돼요</div>
+  </div>
+
+  <button class="cta" id="ctaBtn" disabled>영상을 끝까지 봐야 열려요</button>
+
+  <div class="done-wrap" id="doneWrap">
+    <div class="check-circle">
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+    </div>
+    <h2>시청 완료!</h2>
+    <p>이 화면을 부스 스태프에게 보여주세요.<br>확인 후 선물을 드립니다.</p>
+    <div class="code-box">
+      <div class="code-label">인증 코드</div>
+      <div class="code-value" id="codeValue">0000</div>
+    </div>
+    <button class="reset-link" id="resetBtn">다음 사람 차례라면 여기를 눌러 초기화</button>
+  </div>
+
+</div>
+
+<script>
+  var VIDEO_ID = 'Yg1IUxx3leE';   // https://youtu.be/Yg1IUxx3leE
+  var THRESHOLD = 0.9;             // 90% 이상 시청해야 인증
+
+  var duration = 0;
+  var watchedBuckets = new Set();
+  var unlocked = false;
+  var lastState = -1;              // 1=재생중, 2=일시정지, 0=종료
+  var playerReady = false;
+
+  var fillEl = document.getElementById('progressFill');
+  var pctEl = document.getElementById('progressPct');
+  var statusEl = document.getElementById('statusLine');
+  var ctaBtn = document.getElementById('ctaBtn');
+  var stageEl = document.getElementById('stage');
+  var doneWrap = document.getElementById('doneWrap');
+  var codeValue = document.getElementById('codeValue');
+  var resetBtn = document.getElementById('resetBtn');
+  var playerFrame = document.getElementById('player');
+
+  /* ---- 외부 스크립트 없이 iframe + postMessage 로 YouTube 제어 ---- */
+  function buildEmbedUrl(){
+    var params = ['enablejsapi=1','rel=0','modestbranding=1','playsinline=1','controls=1','fs=1'];
+    if(/^https?:/.test(window.location.origin)){
+      params.push('origin=' + encodeURIComponent(window.location.origin));
+    }
+    return 'https://www.youtube-nocookie.com/embed/' + VIDEO_ID + '?' + params.join('&');
+  }
+
+  function sendToPlayer(msg){
+    if(!playerFrame || !playerFrame.contentWindow) return;
+    try{ playerFrame.contentWindow.postMessage(JSON.stringify(msg), '*'); }catch(e){}
+  }
+
+  function subscribe(){
+    sendToPlayer({ event:'listening', id:'player', channel:'widget' });
+    sendToPlayer({ event:'command', func:'addEventListener', args:['onStateChange'], id:'player', channel:'widget' });
+  }
+
+  playerFrame.addEventListener('load', function(){
+    subscribe();
+    setTimeout(subscribe, 800);   // 첫 메시지 유실 대비
+  });
+  playerFrame.src = buildEmbedUrl();
+
+  window.addEventListener('message', function(e){
+    if(e.source !== playerFrame.contentWindow) return;
+    var data = e.data;
+    if(typeof data === 'string'){ try{ data = JSON.parse(data); }catch(err){ return; } }
+    if(!data || typeof data !== 'object') return;
+
+    if(data.event === 'onReady'){
+      playerReady = true;
+      statusEl.textContent = '재생 버튼을 눌러 시청을 시작해 주세요';
+    } else if(data.event === 'onStateChange'){
+      handleState(data.info);
+    } else if(data.event === 'infoDelivery' && data.info){
+      var info = data.info;
+      if(typeof info.duration === 'number' && info.duration > 0) duration = info.duration;
+      if(typeof info.playerState === 'number') handleState(info.playerState);
+      if(typeof info.currentTime === 'number' && lastState === 1 && duration){
+        watchedBuckets.add(Math.floor(info.currentTime));
+        updateProgress();
+      }
+    }
+  });
+
+  function handleState(state){
+    if(typeof state !== 'number' || state === lastState) return;
+    lastState = state;
+    if(state === 1){
+      statusEl.textContent = '시청 기록 중이에요';
+    } else if(state === 2){
+      statusEl.textContent = '일시정지됨 · 다시 재생하면 이어서 기록돼요';
+    } else if(state === 0){
+      if(duration) watchedBuckets = fullCoverageSet(Math.ceil(duration));
+      updateProgress();
+      statusEl.textContent = '영상을 끝까지 시청했어요';
+    }
+  }
+
+  function fullCoverageSet(n){
+    var s = new Set();
+    for(var i=0;i<n;i++) s.add(i);
+    return s;
+  }
+
+  // 재생 중 infoDelivery 가 끊길 경우를 대비해 1초마다 상태 요청
+  setInterval(function(){
+    if(!playerReady) return;
+    sendToPlayer({ event:'command', func:'getDuration', args:[], id:'player', channel:'widget' });
+    sendToPlayer({ event:'command', func:'getCurrentTime', args:[], id:'player', channel:'widget' });
+    sendToPlayer({ event:'command', func:'getPlayerState', args:[], id:'player', channel:'widget' });
+  }, 1000);
+
+  function updateProgress(){
+    if(!duration) return;
+    var ratio = Math.min(1, watchedBuckets.size / Math.ceil(duration));
+    var pct = Math.round(ratio * 100);
+    fillEl.style.width = pct + '%';
+    pctEl.textContent = pct + '%';
+
+    if(ratio >= THRESHOLD && !unlocked){
+      unlocked = true;
+      ctaBtn.disabled = false;
+      ctaBtn.classList.add('ready');
+      ctaBtn.textContent = '선물 받기';
+      statusEl.textContent = '시청 완료! 아래 버튼을 눌러주세요';
+    }
+  }
+
+  ctaBtn.addEventListener('click', function(){
+    if(!unlocked) return;
+    codeValue.textContent = String(Math.floor(1000 + Math.random()*9000));
+    stageEl.classList.add('done');
+    doneWrap.classList.add('show');
+  });
+
+  resetBtn.addEventListener('click', function(){ location.reload(); });
+</script>
+
+</body>
+</html>

@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>홍보영상 시청 인증</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@400;700&family=Noto+Sans+KR:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+  // 해시로 화면 모드를 미리 결정 (깜빡임 방지)
+  document.documentElement.className = (location.hash === '#watch') ? 'mode-watch' : 'mode-display';
+</script>
+<style>
+  :root{
+    --navy-900:#17213D;
+    --navy-700:#232F55;
+    --navy-600:#2C3A68;
+    --gold-400:#F5B942;
+    --gold-300:#F8C868;
+    --gold-100:#FBE2A5;
+    --paper:#FBF8F2;
+    --ink:#17213D;
+    --ink-soft:#5B6690;
+    --success:#3FB68A;
+    --success-dark:#2C8A68;
+    --warn:#E8875C;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;min-height:100vh;
+    background:
+      radial-gradient(circle at 12% -10%, rgba(245,185,66,0.16), transparent 45%),
+      radial-gradient(circle at 100% 110%, rgba(63,182,138,0.12), transparent 40%),
+      var(--navy-900);
+    font-family:'Noto Sans KR', sans-serif;
+    color:var(--paper);
+    display:flex;justify-content:center;
+    padding:28px 16px 40px;
+  }
+  .stage{width:100%;max-width:460px;}
+
+  html.mode-display .watch-view{display:none;}
+  html.mode-watch .display-view{display:none;}
+
+  .badge{
+    display:inline-flex;align-items:center;gap:6px;
+    background:rgba(245,185,66,0.14);
+    border:1px solid rgba(245,185,66,0.4);
+    color:var(--gold-100);font-size:13px;font-weight:500;
+    padding:6px 12px;border-radius:999px;
+  }
+  .badge svg{width:14px;height:14px;flex-shrink:0;}
+
+  h1{
+    font-family:'Gowun Batang', serif;font-weight:700;
+    font-size:27px;line-height:1.35;margin:14px 0 8px;letter-spacing:-0.01em;
+  }
+  h1 .accent{color:var(--gold-300);}
+
+  .sub{font-size:14.5px;line-height:1.6;color:#C7CCE6;margin:0 0 22px;}
+
+  .card{
+    background:var(--paper);border-radius:20px;padding:20px;
+    box-shadow:0 20px 44px rgba(6,10,26,0.35);color:var(--ink);
+  }
+
+  /* ---- 부스 화면 (display view) ---- */
+  .qr-wrap{
+    display:flex;justify-content:center;padding:14px;
+    background:#fff;border-radius:14px;margin-bottom:6px;
+  }
+  #qrcode{line-height:0;}
+  .qr-caption{
+    text-align:center;font-size:13px;color:var(--ink-soft);
+    margin:10px 0 0;
+  }
+
+  .stat-card{
+    margin-top:16px;background:var(--navy-900);color:var(--paper);
+    border-radius:16px;padding:20px;text-align:center;
+  }
+  .stat-num{
+    font-family:'Gowun Batang', serif;font-size:40px;font-weight:700;
+    color:var(--gold-300);line-height:1;font-variant-numeric:tabular-nums;
+  }
+  .stat-label{font-size:12.5px;color:#C7CCE6;margin-top:6px;}
+
+  .recent-list{margin-top:18px;}
+  .recent-title{font-size:12px;color:var(--ink-soft);margin-bottom:8px;}
+  .recent-item{
+    display:flex;justify-content:space-between;font-size:13.5px;
+    padding:8px 0;border-bottom:1px solid #EDE7D8;
+  }
+  .recent-item:last-child{border-bottom:none;}
+  .recent-name{font-weight:600;}
+  .recent-time{color:var(--ink-soft);}
+  .empty-note{font-size:13px;color:var(--ink-soft);text-align:center;padding:6px 0;}
+
+  .test-link{
+    display:block;text-align:center;margin-top:18px;
+    background:none;border:none;color:#AEB7DE;font-size:12.5px;
+    text-decoration:underline;cursor:pointer;width:100%;
+  }
+
+  /* ---- 시청 화면 (watch view) ---- */
+  .video-frame{
+    position:relative;width:100%;aspect-ratio:16/9;
+    border-radius:12px;overflow:hidden;background:#0c1226;
+  }
+  .video-frame #player{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;}
+
+  .progress-row{display:flex;align-items:center;gap:12px;margin-top:14px;}
+  .progress-track{flex:1;height:8px;border-radius:999px;background:#EAE4D3;overflow:hidden;}
+  .progress-fill{
+    height:100%;width:0%;border-radius:999px;
+    background:linear-gradient(90deg, var(--gold-400), var(--gold-300));
+    transition:width .35s ease;
+  }
+  .progress-pct{font-size:13px;font-weight:700;color:var(--ink);min-width:34px;text-align:right;font-variant-numeric:tabular-nums;}
+  .status-line{margin-top:10px;font-size:12.5px;color:var(--ink-soft);}
+
+  .cta{
+    width:100%;margin-top:14px;border:none;border-radius:14px;
+    padding:17px 20px;font-family:'Noto Sans KR', sans-serif;
+    font-size:16.5px;font-weight:700;cursor:pointer;
+    transition:transform .15s ease, box-shadow .15s ease, background .2s ease;
+  }
+  .cta[disabled]{background:rgba(255,255,255,0.06);color:#7C87AC;cursor:not-allowed;}
+  .cta.ready{
+    background:linear-gradient(135deg, var(--gold-400), #ECA525);color:#231703;
+    box-shadow:0 14px 26px rgba(245,185,66,0.28);
+  }
+  .cta.ready:active{transform:scale(0.98);box-shadow:0 8px 16px rgba(245,185,66,0.24);}
+
+  .done-wrap{display:none;text-align:center;}
+  .done-wrap.show{display:block;}
+  .stage.done .video-view-body{display:none;}
+
+  .check-circle{
+    width:64px;height:64px;margin:0 auto 16px;border-radius:50%;
+    background:linear-gradient(135deg, var(--success), var(--success-dark));
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 10px 20px rgba(63,182,138,0.35);
+  }
+  .check-circle.warn{background:linear-gradient(135deg, var(--warn), #C9612F);box-shadow:0 10px 20px rgba(232,135,92,0.35);}
+  .check-circle svg{width:30px;height:30px;}
+
+  .done-wrap h2{font-family:'Gowun Batang', serif;font-size:22px;margin:0 0 6px;}
+  .done-wrap p{font-size:13.5px;color:var(--ink-soft);margin:0 0 20px;line-height:1.55;}
+
+  .code-box{background:var(--navy-900);border-radius:14px;padding:18px;margin-bottom:6px;}
+  .code-label{font-size:12px;color:var(--gold-100);margin-bottom:6px;}
+  .code-value{font-size:32px;font-weight:800;letter-spacing:0.1em;color:var(--paper);font-variant-numeric:tabular-nums;}
+  .code-name{font-size:12.5px;color:#C7CCE6;margin-top:8px;}
+
+  .record-status{font-size:12px;margin-top:12px;color:var(--ink-soft);}
+  .record-status.ok{color:var(--success-dark);}
+  .record-status.fail{color:var(--warn);}
+
+  @media (prefers-reduced-motion: reduce){ .progress-fill, .cta{transition:none;} }
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage">
+
+  <span class="badge">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 7l-7 5 7 5V7z"/><rect x="1" y="5" width="15" height="14" rx="2"/></svg>
+    학교 홍보 부스
+  </span>
+
+  <!-- ===================== 부스 화면 (스태프가 띄워두는 화면) ===================== -->
+  <div class="display-view">
+    <h1>QR을 스캔하면<br><span class="accent">내 폰</span>으로 바로 시청해요</h1>
+    <p class="sub">카메라로 아래 QR코드를 스캔해서 영상을 시청해 주세요. 다 보면 자동으로 명단에 기록되고, 완료 화면을 스태프에게 보여주면 선물을 드려요.</p>
+
+    <div class="card">
+      <div class="qr-wrap"><div id="qrcode"></div></div>
+      <p class="qr-caption">카메라 앱으로 스캔해 주세요</p>
+    </div>
+
+    <div class="stat-card">
+      <div class="stat-num" id="statNum">–</div>
+      <div class="stat-label">지금까지 시청을 완료한 인원</div>
+    </div>
+
+    <div class="card recent-list">
+      <div class="recent-title">최근 완료</div>
+      <div id="recentBody"><div class="empty-note">불러오는 중…</div></div>
+    </div>
+
+    <button class="test-link" id="testLink">테스트로 시청 화면 열어보기</button>
+  </div>
+
+  <!-- ===================== 참가자 화면 (QR로 접속) ===================== -->
+  <div class="watch-view">
+    <div class="video-view-body">
+      <h1>영상을 끝까지 보면<br><span class="accent">작은 선물</span>이 열려요</h1>
+      <p class="sub">아래 영상을 처음부터 끝까지 시청해 주세요. 다 보면 자동으로 명단에 기록되고, 그 화면을 스태프에게 보여주시면 선물을 드려요.</p>
+
+      <div class="card">
+        <div class="video-frame"><iframe id="player" title="학교 홍보 영상" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen playsinline></iframe></div>
+        <div class="progress-row">
+          <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
+          <div class="progress-pct" id="progressPct">0%</div>
+        </div>
+        <div class="status-line" id="statusLine">영상을 재생하면 시청 기록이 시작돼요</div>
+      </div>
+
+      <button class="cta" id="ctaBtn" disabled>영상을 끝까지 봐야 열려요</button>
+    </div>
+
+    <div class="card done-wrap" id="doneWrap">
+      <div class="check-circle" id="checkCircle">
+        <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
+      </div>
+      <h2 id="doneTitle">등록 완료!</h2>
+      <p>이 화면을 부스 스태프에게 보여주세요.<br>확인 후 선물을 드립니다.</p>
+      <div class="code-box">
+        <div class="code-label">확인 코드</div>
+        <div class="code-value" id="codeValue">0000</div>
+        <div class="code-name" id="codeName"></div>
+      </div>
+      <div class="record-status" id="recordStatus"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  var VIDEO_ID = 'Yg1IUxx3leE';
+  var THRESHOLD = 0.9;
+  var STORAGE_PREFIX = 'checkins:';
+  var isWatchMode = document.documentElement.className === 'mode-watch';
+
+  /* ---------------- 공통: QR 코드 URL 만들기 ---------------- */
+  // QR이 가리킬 시청 페이지. 같은 저장소(폴더)에 올린 school_promo_watch.html 을 자동으로 가리킵니다.
+  // 예: https://gwonbomi97.github.io/저장소이름/school_promo_watch.html
+  var WATCH_FILE = 'school_promo_watch.html';
+  function watchUrl(){
+    var base = window.location.origin + window.location.pathname.replace(/[^\/]*$/, '');
+    return base + WATCH_FILE;
+  }
+
+  /* ---------------- 부스 화면 로직 ---------------- */
+  if(!isWatchMode){
+    try{
+      new QRCode(document.getElementById('qrcode'), {
+        text: watchUrl(),
+        width: 200,
+        height: 200,
+        colorDark: '#17213D',
+        colorLight: '#ffffff',
+        correctLevel: QRCode.CorrectLevel.M
+      });
+    }catch(e){
+      document.getElementById('qrcode').textContent = 'QR 코드를 만들지 못했어요';
+    }
+
+    document.getElementById('testLink').addEventListener('click', function(){
+      window.location.hash = 'watch';
+      window.location.reload();
+    });
+
+    function timeAgo(iso){
+      var diffMs = Date.now() - new Date(iso).getTime();
+      var mins = Math.floor(diffMs / 60000);
+      if(mins < 1) return '방금 전';
+      if(mins < 60) return mins + '분 전';
+      var hrs = Math.floor(mins / 60);
+      return hrs + '시간 전';
+    }
+
+    async function refreshStats(){
+      var statNum = document.getElementById('statNum');
+      var recentBody = document.getElementById('recentBody');
+      try{
+        var listResult = await window.storage.list(STORAGE_PREFIX, true);
+        var keys = (listResult && listResult.keys) ? listResult.keys.slice() : [];
+        statNum.textContent = keys.length;
+
+        if(keys.length === 0){
+          recentBody.innerHTML = '<div class="empty-note">아직 완료한 사람이 없어요</div>';
+          return;
+        }
+
+        keys.sort();
+        var recentKeys = keys.slice(-5).reverse();
+        var rows = '';
+        for(var i=0;i<recentKeys.length;i++){
+          try{
+            var res = await window.storage.get(recentKeys[i], true);
+            if(!res) continue;
+            var data = JSON.parse(res.value);
+            rows += '<div class="recent-item"><span class="recent-name">' +
+              escapeHtml(data.name || '익명') + '</span><span class="recent-time">' +
+              timeAgo(data.time) + '</span></div>';
+          }catch(inner){ /* 개별 항목 오류는 건너뜀 */ }
+        }
+        recentBody.innerHTML = rows || '<div class="empty-note">불러올 수 없어요</div>';
+      }catch(e){
+        statNum.textContent = '–';
+        recentBody.innerHTML = '<div class="empty-note">실시간 집계를 불러올 수 없어요</div>';
+      }
+    }
+
+    function escapeHtml(s){
+      return String(s).replace(/[&<>"']/g, function(c){
+        return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+      });
+    }
+
+    refreshStats();
+    setInterval(refreshStats, 5000);
+  }
+
+  /* ---------------- 참가자(시청) 화면 로직 ---------------- */
+  if(isWatchMode){
+    var player;
+    var duration = 0;
+    var watchedBuckets = new Set();
+    var unlocked = false;
+
+    var fillEl = document.getElementById('progressFill');
+    var pctEl = document.getElementById('progressPct');
+    var statusEl = document.getElementById('statusLine');
+    var ctaBtn = document.getElementById('ctaBtn');
+    var stageEl = document.getElementById('stage');
+    var doneWrap = document.getElementById('doneWrap');
+    var codeValue = document.getElementById('codeValue');
+    var codeName = document.getElementById('codeName');
+    var recordStatus = document.getElementById('recordStatus');
+    var checkCircle = document.getElementById('checkCircle');
+    var doneTitle = document.getElementById('doneTitle');
+
+    /* ---- 외부 스크립트 없이 iframe + postMessage 로 YouTube 제어 ---- */
+    var playerFrame = document.getElementById('player');
+    var lastState = -1;          // 1=재생중, 2=일시정지, 0=종료
+    var playerReady = false;
+
+    function buildEmbedUrl(){
+      var params = [
+        'enablejsapi=1', 'rel=0', 'modestbranding=1', 'playsinline=1',
+        'controls=1', 'fs=1'
+      ];
+      // sandbox 환경에서는 origin이 'null'이 될 수 있어 http(s)일 때만 전달
+      if(/^https?:/.test(window.location.origin)){
+        params.push('origin=' + encodeURIComponent(window.location.origin));
+      }
+      return 'https://www.youtube-nocookie.com/embed/' + VIDEO_ID + '?' + params.join('&');
+    }
+
+    function sendToPlayer(msg){
+      if(!playerFrame || !playerFrame.contentWindow) return;
+      try{ playerFrame.contentWindow.postMessage(JSON.stringify(msg), '*'); }catch(e){}
+    }
+
+    // iframe 로드 후 이벤트 구독 요청 → YouTube가 onReady / infoDelivery 를 보내줌
+    playerFrame.addEventListener('load', function(){
+      sendToPlayer({ event: 'listening', id: 'player', channel: 'widget' });
+      sendToPlayer({ event: 'command', func: 'addEventListener', args: ['onStateChange'], id: 'player', channel: 'widget' });
+      // 일부 환경에서 첫 listening 메시지가 유실되므로 잠시 후 한 번 더
+      setTimeout(function(){ sendToPlayer({ event: 'listening', id: 'player', channel: 'widget' }); }, 800);
+    });
+    playerFrame.src = buildEmbedUrl();
+
+    window.addEventListener('message', function(e){
+      if(e.source !== playerFrame.contentWindow) return;
+      var data = e.data;
+      if(typeof data === 'string'){
+        try{ data = JSON.parse(data); }catch(err){ return; }
+      }
+      if(!data || typeof data !== 'object') return;
+
+      if(data.event === 'onReady'){
+        playerReady = true;
+        statusEl.textContent = '재생 버튼을 눌러 시청을 시작해 주세요';
+        return;
+      }
+
+      if(data.event === 'onStateChange'){
+        handleState(data.info);
+        return;
+      }
+
+      if(data.event === 'infoDelivery' && data.info){
+        var info = data.info;
+        if(typeof info.duration === 'number' && info.duration > 0) duration = info.duration;
+        if(typeof info.playerState === 'number') handleState(info.playerState);
+        if(typeof info.currentTime === 'number' && lastState === 1 && duration){
+          watchedBuckets.add(Math.floor(info.currentTime));
+          updateProgress();
+        }
+      }
+    });
+
+    function handleState(state){
+      if(typeof state !== 'number' || state === lastState) return;
+      lastState = state;
+      if(state === 1){
+        statusEl.textContent = '시청 기록 중이에요';
+      } else if(state === 2){
+        statusEl.textContent = '일시정지됨 · 다시 재생하면 이어서 기록돼요';
+      } else if(state === 0){
+        if(duration) watchedBuckets = fullCoverageSet(Math.ceil(duration));
+        updateProgress();
+        statusEl.textContent = '영상을 끝까지 시청했어요';
+      }
+    }
+
+    function fullCoverageSet(n){
+      var s = new Set();
+      for(var i=0;i<n;i++) s.add(i);
+      return s;
+    }
+
+    // 재생 중 infoDelivery 가 끊길 경우를 대비해 주기적으로 상태 요청
+    setInterval(function(){
+      if(!playerReady) return;
+      sendToPlayer({ event: 'command', func: 'getDuration', args: [], id: 'player', channel: 'widget' });
+      sendToPlayer({ event: 'command', func: 'getCurrentTime', args: [], id: 'player', channel: 'widget' });
+      sendToPlayer({ event: 'command', func: 'getPlayerState', args: [], id: 'player', channel: 'widget' });
+    }, 1000);
+
+    function updateProgress(){
+      if(!duration) return;
+      var ratio = Math.min(1, watchedBuckets.size / Math.ceil(duration));
+      var pct = Math.round(ratio * 100);
+      fillEl.style.width = pct + '%';
+      pctEl.textContent = pct + '%';
+
+      if(ratio >= THRESHOLD && !unlocked){
+        unlocked = true;
+        ctaBtn.disabled = false;
+        ctaBtn.classList.add('ready');
+        ctaBtn.textContent = '선물 받기';
+        statusEl.textContent = '시청 완료! 아래 버튼을 눌러 등록해 주세요';
+      }
+    }
+
+    ctaBtn.addEventListener('click', async function(){
+      if(!unlocked) return;
+      ctaBtn.disabled = true;
+      ctaBtn.textContent = '등록 중…';
+
+      var name = '';
+      var now = new Date().toISOString();
+      var code = String(Math.floor(1000 + Math.random()*9000));
+      var key = STORAGE_PREFIX + now + '-' + Math.random().toString(36).slice(2,7);
+
+      var saved = false;
+      try{
+        var result = await window.storage.set(key, JSON.stringify({ name: name || '익명', time: now, code: code }), true);
+        saved = !!result;
+      }catch(e){
+        saved = false;
+      }
+
+      codeValue.textContent = code;
+      codeName.textContent = name ? (name + ' 님') : '';
+
+      if(saved){
+        doneTitle.textContent = '등록 완료!';
+        recordStatus.textContent = '명단에 자동으로 기록되었어요';
+        recordStatus.className = 'record-status ok';
+      }else{
+        checkCircle.classList.add('warn');
+        doneTitle.textContent = '시청은 확인됐어요';
+        recordStatus.textContent = '명단 저장에는 실패했어요 — 이 코드를 스태프에게 알려주세요';
+        recordStatus.className = 'record-status fail';
+      }
+
+      stageEl.classList.add('done');
+      doneWrap.classList.add('show');
+    });
+  }
+</script>
+
+</body>
+</html>
