@@ -50,6 +50,11 @@
   .progress-fill{height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg, var(--gold-400), var(--gold-300));transition:width .35s ease;}
   .progress-pct{font-size:13px;font-weight:700;color:var(--ink);min-width:34px;text-align:right;font-variant-numeric:tabular-nums;}
   .status-line{margin-top:10px;font-size:12.5px;color:var(--ink-soft);}
+  .unmute-btn{
+    margin-top:12px;width:100%;border:1.5px solid var(--navy-900);background:#fff;color:var(--navy-900);
+    border-radius:10px;padding:11px;font-family:'Noto Sans KR',sans-serif;font-size:14px;font-weight:600;cursor:pointer;
+  }
+  .unmute-btn.hidden{display:none;}
   .cta{
     width:100%;margin-top:20px;border:none;border-radius:14px;padding:17px 20px;
     font-family:'Noto Sans KR', sans-serif;font-size:16.5px;font-weight:700;cursor:pointer;
@@ -114,7 +119,7 @@
   </span>
 
   <h1>영상을 끝까지 보면<br><span class="accent">작은 선물</span>이 열려요</h1>
-  <p class="sub">아래 영상을 처음부터 끝까지 시청해 주세요. 다 보고 나면 인증 코드가 나와요. 그 화면을 스태프에게 보여주시면 선물을 드려요.</p>
+  <p class="sub">아래 영상을 3분 이상 시청해 주세요. 다 보고 나면 인증 코드가 나와요. 그 화면을 스태프에게 보여주시면 선물을 드려요.</p>
 
   <div class="video-card">
     <div class="video-frame">
@@ -124,10 +129,11 @@
       <div class="progress-track"><div class="progress-fill" id="progressFill"></div></div>
       <div class="progress-pct" id="progressPct">0%</div>
     </div>
-    <div class="status-line" id="statusLine">영상을 재생하면 시청 기록이 시작돼요</div>
+    <div class="status-line" id="statusLine">영상이 자동으로 재생돼요</div>
+    <button class="unmute-btn" id="unmuteBtn">🔊 소리 켜기</button>
   </div>
 
-  <button class="cta" id="ctaBtn" disabled>영상을 끝까지 봐야 열려요</button>
+  <button class="cta" id="ctaBtn" disabled>영상을 3분 이상 봐야 열려요</button>
 
   <div class="done-wrap" id="doneWrap">
     <div class="check-circle">
@@ -183,7 +189,7 @@
   })();
 
   var VIDEO_ID = 'Yg1IUxx3leE';   // https://youtu.be/Yg1IUxx3leE
-  var THRESHOLD = 0.9;             // 90% 이상 시청해야 인증
+  var REQUIRED_SECONDS = 180;      // 3분(180초) 이상 시청해야 인증
   // 집계용 Apps Script 웹앱 URL (부스 페이지와 같은 주소)
   var API_URL = 'https://script.google.com/macros/s/AKfycbymEagi7F7gsYsqr2xY8GrZ9YBj8UcOBPRh3os6I1XW4VNF5eSnCRlD6jyiwPIb3_TvVg/exec';
 
@@ -205,7 +211,7 @@
 
   /* ---- 외부 스크립트 없이 iframe + postMessage 로 YouTube 제어 ---- */
   function buildEmbedUrl(){
-    var params = ['enablejsapi=1','rel=0','modestbranding=1','playsinline=1','controls=1','fs=1'];
+    var params = ['enablejsapi=1','autoplay=1','mute=1','rel=0','modestbranding=1','playsinline=1','controls=1','fs=1'];
     if(/^https?:/.test(window.location.origin)){
       params.push('origin=' + encodeURIComponent(window.location.origin));
     }
@@ -236,13 +242,14 @@
 
     if(data.event === 'onReady'){
       playerReady = true;
-      statusEl.textContent = '재생 버튼을 눌러 시청을 시작해 주세요';
+      statusEl.textContent = '영상이 자동으로 재생돼요 · 소리는 아래 버튼으로 켤 수 있어요';
     } else if(data.event === 'onStateChange'){
       handleState(data.info);
     } else if(data.event === 'infoDelivery' && data.info){
       var info = data.info;
       if(typeof info.duration === 'number' && info.duration > 0) duration = info.duration;
       if(typeof info.playerState === 'number') handleState(info.playerState);
+      if(info.muted === false) unmuteBtn.classList.add('hidden');
       if(typeof info.currentTime === 'number' && lastState === 1 && duration){
         watchedBuckets.add(Math.floor(info.currentTime));
         updateProgress();
@@ -255,10 +262,11 @@
     lastState = state;
     if(state === 1){
       statusEl.textContent = '시청 기록 중이에요';
+      updateProgress();
     } else if(state === 2){
       statusEl.textContent = '일시정지됨 · 다시 재생하면 이어서 기록돼요';
     } else if(state === 0){
-      if(duration) watchedBuckets = fullCoverageSet(Math.ceil(duration));
+      watchedBuckets = fullCoverageSet(requiredSeconds());
       updateProgress();
       statusEl.textContent = '영상을 끝까지 시청했어요';
     }
@@ -278,23 +286,40 @@
     sendToPlayer({ event:'command', func:'getPlayerState', args:[], id:'player', channel:'widget' });
   }, 1000);
 
+  function requiredSeconds(){
+    // 영상이 3분보다 짧으면 영상 길이만큼만 보면 됨
+    return duration ? Math.min(REQUIRED_SECONDS, Math.ceil(duration)) : REQUIRED_SECONDS;
+  }
+
   function updateProgress(){
-    if(!duration) return;
-    var ratio = Math.min(1, watchedBuckets.size / Math.ceil(duration));
+    var need = requiredSeconds();
+    var watched = Math.min(watchedBuckets.size, need);
+    var ratio = watched / need;
     var pct = Math.round(ratio * 100);
     fillEl.style.width = pct + '%';
     pctEl.textContent = pct + '%';
+    var remain = need - watched;
+    if(!unlocked && remain > 0 && lastState === 1){
+      statusEl.textContent = '시청 기록 중 · ' + Math.floor(remain/60) + '분 ' + (remain%60) + '초 남았어요';
+    }
 
-    if(ratio >= THRESHOLD && !unlocked){
+    if(ratio >= 1 && !unlocked){
       unlocked = true;
       ctaBtn.disabled = false;
       ctaBtn.classList.add('ready');
       ctaBtn.textContent = '선물 받기';
-      statusEl.textContent = '시청 완료! 아래 버튼을 눌러주세요';
+      statusEl.textContent = '3분 시청 완료! 아래 버튼을 눌러주세요';
     }
   }
 
   var recordStatus = document.getElementById('recordStatus');
+  var unmuteBtn = document.getElementById('unmuteBtn');
+  unmuteBtn.addEventListener('click', function(){
+    sendToPlayer({ event:'command', func:'unMute', args:[], id:'player', channel:'widget' });
+    sendToPlayer({ event:'command', func:'setVolume', args:[100], id:'player', channel:'widget' });
+    sendToPlayer({ event:'command', func:'playVideo', args:[], id:'player', channel:'widget' });
+    unmuteBtn.classList.add('hidden');
+  });
 
   ctaBtn.addEventListener('click', async function(){
     if(!unlocked) return;
