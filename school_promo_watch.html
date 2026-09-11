@@ -138,6 +138,50 @@
   .ext-btn{display:block;width:100%;border:none;border-radius:12px;padding:14px;font-family:'Noto Sans KR',sans-serif;font-size:15px;font-weight:800;
     background:linear-gradient(135deg, var(--yellow), var(--orange));color:#3A2400;cursor:pointer;text-decoration:none;}
   .ext-skip{background:none;border:none;color:var(--ink-soft);font-size:12.5px;text-decoration:underline;margin-top:10px;cursor:pointer;}
+  /* ---- 영상 전 미리보기 문제 ---- */
+  .preview-quiz{
+    background:linear-gradient(135deg, #FFF6DC, #FFE9EF);
+    border:2px dashed #F2C87A;border-radius:18px;padding:16px 18px;margin:0 0 18px;
+  }
+  .preview-quiz .pq-badge{
+    display:inline-flex;align-items:center;gap:6px;background:#fff;color:#B8720C;
+    font-size:12.5px;font-weight:800;padding:5px 12px;border-radius:999px;margin-bottom:10px;
+  }
+  .preview-quiz ol{margin:0;padding-left:20px;}
+  .preview-quiz li{font-size:14.5px;font-weight:700;line-height:1.6;color:var(--ink);margin-bottom:4px;}
+  .stage.quiz .preview-quiz,.stage.done .preview-quiz{display:none;}
+
+  /* ---- 시청 확인 퀴즈 ---- */
+  .quiz-wrap{
+    display:none;background:var(--card);border-radius:22px;padding:26px 22px 24px;
+    box-shadow:0 12px 34px rgba(255,150,120,0.18);color:var(--ink);
+  }
+  .quiz-wrap.show{display:block;}
+  .stage.quiz .video-card,.stage.quiz .cta{display:none;}
+  .quiz-badge{
+    display:inline-flex;align-items:center;gap:6px;background:var(--yellow-soft);color:#8A6A00;
+    font-size:12.5px;font-weight:800;padding:6px 14px;border-radius:999px;margin-bottom:14px;
+  }
+  .quiz-q{font-size:17px;font-weight:800;line-height:1.5;margin:0 0 16px;}
+  .quiz-options{display:flex;flex-direction:column;gap:10px;margin-bottom:8px;}
+  .quiz-opt{
+    text-align:left;width:100%;border:2px solid #EFE7D6;background:#FFFBF2;color:var(--ink);
+    border-radius:14px;padding:14px 16px;font-family:'Noto Sans KR',sans-serif;font-size:15px;font-weight:600;cursor:pointer;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  .quiz-opt:active{transform:scale(0.99);}
+  .quiz-opt.correct{border-color:var(--mint-dark);background:#E9FBF3;color:var(--mint-dark);}
+  .quiz-opt.wrong{border-color:var(--pink-dark);background:#FFEAF0;color:var(--pink-dark);}
+  .quiz-feedback{min-height:22px;font-size:13.5px;font-weight:700;margin:10px 0 4px;}
+  .quiz-feedback.ok{color:var(--mint-dark);}
+  .quiz-feedback.no{color:var(--pink-dark);}
+  .quiz-next{
+    width:100%;margin-top:14px;border:none;border-radius:999px;padding:15px;
+    font-family:'Noto Sans KR',sans-serif;font-size:15.5px;font-weight:800;cursor:pointer;
+    background:linear-gradient(135deg, var(--yellow), var(--orange));color:#3A2400;
+    box-shadow:0 10px 20px rgba(255,162,76,0.32);display:none;
+  }
+  .quiz-next.show{display:block;}
   @media (prefers-reduced-motion: reduce){.progress-fill,.cta{transition:none;}}
 </style>
 </head>
@@ -215,6 +259,11 @@
 
   <p class="sub">아래 영상을 3분 이상 시청해 주세요.<br>다 보고 나면 인증 코드가 나와요.<br>그 화면을 스태프에게 보여주시면 선물을 드려요!</p>
 
+  <div class="preview-quiz" id="previewQuiz">
+    <span class="pq-badge">🔍 영상을 보면서 아래 질문의 답을 찾아보세요</span>
+    <ol id="previewQuizList"></ol>
+  </div>
+
   <div class="video-card">
     <div class="video-frame">
       <iframe id="player" title="학교 홍보 영상" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen playsinline></iframe>
@@ -228,6 +277,14 @@
   </div>
 
   <button class="cta" id="ctaBtn" disabled>🎁 영상을 3분 이상 봐야 열려요!</button>
+
+  <div class="quiz-wrap" id="quizWrap">
+    <span class="quiz-badge">🎬 영상 내용 확인 · <span id="quizStep">1</span>/2</span>
+    <p class="quiz-q" id="quizQ"></p>
+    <div class="quiz-options" id="quizOptions"></div>
+    <div class="quiz-feedback" id="quizFeedback"></div>
+    <button class="quiz-next" id="quizNext">다음 문제</button>
+  </div>
 
   <div class="done-wrap" id="doneWrap">
     <div class="check-circle">
@@ -591,17 +648,114 @@
     unmuteBtn.classList.add('hidden');
   });
 
-  ctaBtn.addEventListener('click', async function(){
-    if(!unlocked) return;
+  /* ---- 시청 확인 퀴즈 ---- */
+  var QUIZ_BANK = [
+    { q:'서진여고에서 전국 최초·광주 유일로 딸 수 있는 자격증은?',
+      options:['간호조무사','요양보호사','사회복지사','조리사'], answer:'간호조무사' },
+    { q:'서진여고 시각디자인과에서 딸 수 있는 자격증은?',
+      options:['컴퓨터그래픽기능사','정보처리기능사','미용사','조리기능사'], answer:'컴퓨터그래픽기능사' },
+    { q:'서진여고 생활체육과에서 배우는 과목은?',
+      options:['필라테스','배드민턴','농구','야구'], answer:'필라테스' },
+    { q:'서진여고 학과로 옳은 것은?',
+      options:['조리과','반려동물과','전기과','보통과'], answer:'보통과' }
+  ];
 
-    ctaBtn.disabled = true;
-    ctaBtn.textContent = '등록 중…';
+  function shuffle(arr){
+    var a = arr.slice();
+    for(var i=a.length-1;i>0;i--){
+      var j = Math.floor(Math.random()*(i+1));
+      var t=a[i]; a[i]=a[j]; a[j]=t;
+    }
+    return a;
+  }
+
+  // 페이지가 열릴 때 2문제를 확정 → 미리보기와 실제 퀴즈에 동일하게 사용
+  var quizQueue = shuffle(QUIZ_BANK).slice(0, 2);
+  var quizIndex = 0;
+  var quizAnsweredCorrect = false;
+
+  (function renderPreviewQuiz(){
+    var list = document.getElementById('previewQuizList');
+    list.innerHTML = '';
+    quizQueue.forEach(function(item){
+      var li = document.createElement('li');
+      li.textContent = item.q;   // 보기는 보여주지 않음
+      list.appendChild(li);
+    });
+  })();
+
+  function startQuiz(){
+    quizIndex = 0;
+    stageEl.classList.add('quiz');
+    document.getElementById('quizWrap').classList.add('show');
+    renderQuiz();
+  }
+
+  function renderQuiz(){
+    var item = quizQueue[quizIndex];
+    quizAnsweredCorrect = false;
+    document.getElementById('quizStep').textContent = String(quizIndex + 1);
+    document.getElementById('quizQ').textContent = item.q;
+
+    var feedback = document.getElementById('quizFeedback');
+    feedback.textContent = '';
+    feedback.className = 'quiz-feedback';
+
+    var nextBtn = document.getElementById('quizNext');
+    nextBtn.classList.remove('show');
+
+    var optsWrap = document.getElementById('quizOptions');
+    optsWrap.innerHTML = '';
+    shuffle(item.options).forEach(function(opt){
+      var btn = document.createElement('button');
+      btn.className = 'quiz-opt';
+      btn.type = 'button';
+      btn.textContent = opt;
+      btn.addEventListener('click', function(){ onQuizAnswer(opt, item.answer, optsWrap, btn); });
+      optsWrap.appendChild(btn);
+    });
+  }
+
+  function onQuizAnswer(picked, correctAns, optsWrap, btnEl){
+    if(quizAnsweredCorrect) return;
+    var feedback = document.getElementById('quizFeedback');
+    var nextBtn = document.getElementById('quizNext');
+    var buttons = optsWrap.querySelectorAll('.quiz-opt');
+
+    if(picked === correctAns){
+      quizAnsweredCorrect = true;
+      buttons.forEach(function(b){
+        b.disabled = true;
+        if(b.textContent === correctAns) b.classList.add('correct');
+      });
+      feedback.textContent = '정답이에요!';
+      feedback.className = 'quiz-feedback ok';
+
+      if(quizIndex < quizQueue.length - 1){
+        nextBtn.textContent = '다음 문제';
+        nextBtn.classList.add('show');
+        nextBtn.onclick = function(){ quizIndex++; renderQuiz(); };
+      }else{
+        nextBtn.textContent = '🎁 인증 코드 받기';
+        nextBtn.classList.add('show');
+        nextBtn.onclick = function(){ finishAfterQuiz(nextBtn); };
+      }
+    }else{
+      btnEl.classList.add('wrong');
+      btnEl.disabled = true;
+      feedback.textContent = '다시 한 번 생각해 보세요';
+      feedback.className = 'quiz-feedback no';
+    }
+  }
+
+  async function finishAfterQuiz(nextBtn){
+    nextBtn.disabled = true;
+    nextBtn.textContent = '등록 중…';
 
     var code = String(Math.floor(1000 + Math.random() * 9000));
     codeValue.textContent = code;
 
     var saved = false;
-
     if(API_URL){
       try{
         var r = await fetch(
@@ -623,8 +777,15 @@
       recordStatus.className = 'record-status fail';
     }
 
+    stageEl.classList.remove('quiz');
+    document.getElementById('quizWrap').classList.remove('show');
     stageEl.classList.add('done');
     doneWrap.classList.add('show');
+  }
+
+  ctaBtn.addEventListener('click', function(){
+    if(!unlocked) return;
+    startQuiz();
   });
 
   resetBtn.addEventListener('click', function(){
